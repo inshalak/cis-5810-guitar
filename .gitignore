@@ -1,0 +1,29 @@
+# Virtual environment
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Audio files (if they're large)
+*.wav
+*.mp3
+*.flac
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
