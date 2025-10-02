@@ -1,0 +1,9 @@
+# Core dependencies for Air Guitar CV Application
+mediapipe==0.10.9
+opencv-python==4.9.0.80
+numpy==1.24.3
+pygame==2.5.2
+
+# Optional: for future enhancements
+# pydub==0.25.1  # for audio processing
+# matplotlib==3.8.0  # for visualization/debugging
