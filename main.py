@@ -143,6 +143,7 @@ class AirGuitar:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, TEXT_COLOR, 2)
 
         # Draw chord mapping guide (left side)
+        # need to fix left and right hand detection.
         chord_guide = [
             "LEFT HAND - CHORDS:",
             "Fist   -> Am",
