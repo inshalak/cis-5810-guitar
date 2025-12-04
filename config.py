@@ -26,6 +26,10 @@ CHORD_MAP = {
 # Strumming settings (right hand)
 STRUM_THRESHOLD = 0.05  # Minimum hand movement to register strum
 STRUM_COOLDOWN = 0.1    # Seconds between strums to prevent double-triggering
+STRUM_VELOCITY_MIN = 0.1  # Minimum velocity for quietest strum
+STRUM_VELOCITY_MAX = 2.0  # Maximum velocity for loudest strum
+STRUM_VOLUME_MIN = 0.3    # Minimum volume (30%) for slow strums
+STRUM_VOLUME_MAX = 1.0    # Maximum volume (100%) for fast strums
 
 # Audio settings
 AUDIO_SAMPLE_RATE = 44100
@@ -40,3 +44,7 @@ TEXT_COLOR = (255, 255, 255)       # White
 # Performance settings
 MAX_LATENCY_MS = 50
 TARGET_FPS = 30
+
+# Position validation settings
+POSITION_TOLERANCE_GOOD = 0.15  # Distance threshold for "good" (green) - normalized units
+POSITION_TOLERANCE_OKAY = 0.25  # Distance threshold for "okay" (yellow) - normalized units

@@ -23,8 +23,10 @@ class ChordDetector:
         if not hand_landmarks or not fingers_up:
             return None
 
-        # Count extended fingers
-        finger_count = sum(fingers_up)
+        # Count extended fingers (excluding thumb - only count index, middle, ring, pinky)
+        # fingers_up = [thumb, index, middle, ring, pinky]
+        # For chord detection, we only count the 4 main fingers (not thumb)
+        finger_count = sum(fingers_up[1:])  # Skip thumb (index 0), count only fingers 1-4
 
         # Check for special gestures first
         chord = self._check_special_gestures(fingers_up)

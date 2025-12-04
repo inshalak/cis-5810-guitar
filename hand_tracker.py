@@ -32,17 +32,21 @@ class HandTracker:
         hands_data = {'left_hand': None, 'right_hand': None}
 
         if results.multi_hand_landmarks and results.multi_handedness:
-            # Assign hands based on position (user's perspective)
+            # Assign hands based on MediaPipe's handedness classification
+            # MediaPipe processes the original (non-mirrored) frame, but we display mirrored
+            # For right-handed guitar: left hand = chords, right hand = strumming
             for hand_landmarks, handedness in zip(results.multi_hand_landmarks, results.multi_handedness):
-                # MediaPipe returns "Left"/"Right" from camera perspective
-                # We need to flip it for user perspective (mirrored camera)
                 label = handedness.classification[0].label
 
-                # Flip the label for natural user experience
+                # MediaPipe's handedness is based on hand structure
+                # In mirrored display: MediaPipe's "Left" = user's left hand, "Right" = user's right hand
+                # Left hand = chords, Right hand = strumming
                 if label == "Left":
-                    hands_data['right_hand'] = hand_landmarks
-                else:
+                    # User's left hand = chords
                     hands_data['left_hand'] = hand_landmarks
+                else:  # "Right"
+                    # User's right hand = strumming
+                    hands_data['right_hand'] = hand_landmarks
 
         return hands_data, results
 

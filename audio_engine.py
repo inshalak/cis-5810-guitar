@@ -110,14 +110,19 @@ class AudioEngine:
             self.samples[chord] = sound
             print(f"Generated tone for: {chord}")
 
-    def play_chord(self, chord_name):
+    def play_chord(self, chord_name, volume=1.0):
         """
-        Play the audio sample for the given chord
+        Play the audio sample for the given chord with volume control
 
         Args:
             chord_name: name of the chord (e.g., "C", "G", "Am")
+            volume: volume level (0.0 to 1.0), default is 1.0 (full volume)
         """
         if chord_name in self.samples:
+            # Clamp volume to valid range
+            volume = max(0.0, min(1.0, volume))
+            # Set volume and play
+            self.samples[chord_name].set_volume(volume)
             self.samples[chord_name].play()
             return True
         return False
