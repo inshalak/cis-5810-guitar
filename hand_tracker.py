@@ -40,9 +40,9 @@ class HandTracker:
 
                 # Flip the label for natural user experience
                 if label == "Left":
-                    hands_data['right_hand'] = hand_landmarks
-                else:
                     hands_data['left_hand'] = hand_landmarks
+                else:
+                    hands_data['right_hand'] = hand_landmarks
 
         return hands_data, results
 

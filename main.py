@@ -9,6 +9,7 @@ from hand_tracker import HandTracker
 from chord_detector import ChordDetector
 from strum_detector import StrumDetector
 from audio_engine import AudioEngine
+from fretboard_display import FretboardDisplay
 from config import CAMERA_WIDTH, CAMERA_HEIGHT, FPS, CHORD_DISPLAY_COLOR, TEXT_COLOR, STRUM_TRAIL_COLOR
 
 
@@ -22,6 +23,7 @@ class AirGuitar:
         self.chord_detector = ChordDetector()
         self.strum_detector = StrumDetector()
         self.audio_engine = AudioEngine()
+        self.fretboard_display = FretboardDisplay()
 
         # Camera setup
         self.cap = cv2.VideoCapture(0)
@@ -33,6 +35,7 @@ class AirGuitar:
         self.current_chord = None
         self.fps_counter = []
         self.strum_trail_positions = []  # For visual feedback
+        self.last_strum_velocity = 0.0  # Track velocity for display
 
         print("✓ Initialization complete!")
         print("\nControls:")
@@ -72,20 +75,31 @@ class AirGuitar:
                 if detected_chord:
                     self.current_chord = detected_chord
 
-            # Right hand: strum detection
+            # Right hand: continuous strum detection with velocity
             if hands_data['right_hand']:
-                is_strum, direction = self.strum_detector.detect_strum(hands_data['right_hand'])
+                is_moving, direction, velocity = self.strum_detector.detect_strum(hands_data['right_hand'])
 
-                # Play chord when strumming is detected
-                if is_strum and self.current_chord:
-                    self.audio_engine.play_chord(self.current_chord)
+                if is_moving and self.current_chord:
+                    # Hand is moving - play/continue chord with dynamic volume
+                    self.audio_engine.play_chord_continuous(self.current_chord, volume=velocity)
+                    self.last_strum_velocity = velocity
+
                     # Record strum position for visual trail
                     wrist = hands_data['right_hand'].landmark[0]
                     self.strum_trail_positions.append({
                         'x': int(wrist.x * frame.shape[1]),
                         'y': int(wrist.y * frame.shape[0]),
-                        'time': time.time()
+                        'time': time.time(),
+                        'velocity': velocity
                     })
+                else:
+                    # Hand stopped or no chord - stop sound
+                    if self.audio_engine.is_playing():
+                        self.audio_engine.stop_chord()
+            else:
+                # No right hand detected - stop sound
+                if self.audio_engine.is_playing():
+                    self.audio_engine.stop_chord()
 
             # Draw visualizations
             frame = self._draw_ui(frame, results)
@@ -112,7 +126,7 @@ class AirGuitar:
         # Draw hand landmarks
         frame = self.hand_tracker.draw_landmarks(frame, results)
 
-        # Draw strum trail
+        # Draw strum trail with velocity-based size
         current_time = time.time()
         self.strum_trail_positions = [
             pos for pos in self.strum_trail_positions
@@ -120,21 +134,74 @@ class AirGuitar:
         ]
         for i, pos in enumerate(self.strum_trail_positions):
             alpha = 1 - (current_time - pos['time']) / 0.5  # Fade out
-            radius = int(10 * alpha)
+            # Size varies with velocity (0.3-1.0 -> radius 6-15)
+            base_radius = 6 + int(9 * pos.get('velocity', 0.5))
+            radius = int(base_radius * alpha)
             if radius > 0:
-                cv2.circle(frame, (pos['x'], pos['y']), radius, STRUM_TRAIL_COLOR, -1)
+                # Color intensity varies with velocity
+                velocity = pos.get('velocity', 0.5)
+                color = (
+                    int(STRUM_TRAIL_COLOR[0] * velocity),
+                    int(STRUM_TRAIL_COLOR[1] * velocity),
+                    int(STRUM_TRAIL_COLOR[2])
+                )
+                cv2.circle(frame, (pos['x'], pos['y']), radius, color, -1)
 
-        # Draw current chord display
+        # Draw current chord display with playing indicator
         chord_text = f"Chord: {self.current_chord if self.current_chord else 'None'}"
-        cv2.putText(frame, chord_text, (20, 50),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1.5, CHORD_DISPLAY_COLOR, 3)
+        if self.audio_engine.is_playing():
+            # Add pulsing indicator when playing
+            chord_text += " ♪"
+            chord_color = (0, 255, 255)  # Bright cyan when playing
+        else:
+            chord_color = CHORD_DISPLAY_COLOR  # Green when not playing
 
-        # Draw strum direction indicator
+        cv2.putText(frame, chord_text, (20, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.5, chord_color, 3)
+
+        # Draw strum direction and velocity indicator
         strum_dir = self.strum_detector.get_last_strum_direction()
         if strum_dir:
             arrow = "↓ DOWN" if strum_dir == "down" else "↑ UP"
             cv2.putText(frame, f"Strum: {arrow}", (20, 100),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, TEXT_COLOR, 2)
+
+        # Draw velocity bar (volume indicator) with percentage
+        if self.last_strum_velocity > 0:
+            bar_x = w - 50
+            bar_y = 60
+            bar_height = 150
+            bar_width = 30
+
+            # Background bar
+            cv2.rectangle(frame, (bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height),
+                         (50, 50, 50), -1)
+            cv2.rectangle(frame, (bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height),
+                         TEXT_COLOR, 2)
+
+            # Velocity fill (bottom to top)
+            fill_height = int(bar_height * self.last_strum_velocity)
+            fill_y = bar_y + bar_height - fill_height
+
+            # Color gradient: green (soft) -> yellow (medium) -> red (hard)
+            if self.last_strum_velocity < 0.4:
+                color = (0, 200, 0)  # Green
+            elif self.last_strum_velocity < 0.7:
+                color = (0, 255, 255)  # Yellow
+            else:
+                color = (0, 100, 255)  # Orange-red
+
+            cv2.rectangle(frame, (bar_x, fill_y), (bar_x + bar_width, bar_y + bar_height),
+                         color, -1)
+
+            # Label and percentage
+            cv2.putText(frame, "VOL", (bar_x - 5, bar_y - 20),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, TEXT_COLOR, 1)
+
+            # Show percentage
+            percentage = int(self.last_strum_velocity * 100)
+            cv2.putText(frame, f"{percentage}%", (bar_x - 10, bar_y + bar_height + 20),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
         # Draw FPS
         if self.fps_counter:
@@ -161,9 +228,14 @@ class AirGuitar:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, TEXT_COLOR, 1)
             y_offset += 22
 
+        # Draw fretboard display
+        if self.current_chord:
+            fretboard = self.fretboard_display.draw_fretboard(self.current_chord)
+            frame = self.fretboard_display.overlay_on_frame(frame, fretboard, position=(10, h - 300))
+
         # Draw instructions (bottom)
         instructions = [
-            "RIGHT HAND: Strum up/down",
+            "RIGHT HAND: Strum up/down (harder = louder)",
             "Press 'q' to quit"
         ]
         y_offset = h - 60

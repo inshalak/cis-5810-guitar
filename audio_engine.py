@@ -19,6 +19,8 @@ class AudioEngine:
         pygame.mixer.init(frequency=AUDIO_SAMPLE_RATE, channels=2)
         self.samples_dir = samples_dir
         self.samples = {}
+        self.currently_playing_chord = None
+        self.current_channel = None
         self._load_samples()
 
     def _load_samples(self):
@@ -110,21 +112,61 @@ class AudioEngine:
             self.samples[chord] = sound
             print(f"Generated tone for: {chord}")
 
-    def play_chord(self, chord_name):
+    def play_chord_continuous(self, chord_name, volume=1.0):
         """
-        Play the audio sample for the given chord
+        Play chord continuously (looping) while hand is moving
 
         Args:
             chord_name: name of the chord (e.g., "C", "G", "Am")
+            volume: volume level (0.0 to 1.0), defaults to 1.0
         """
-        if chord_name in self.samples:
-            self.samples[chord_name].play()
+        if chord_name not in self.samples:
+            return False
+
+        # Clamp volume to valid range
+        volume = max(0.0, min(1.0, volume))
+
+        # If same chord is already playing, just update volume
+        if self.currently_playing_chord == chord_name and self.current_channel and self.current_channel.get_busy():
+            self.samples[chord_name].set_volume(volume)
             return True
-        return False
+
+        # Stop any currently playing chord
+        self.stop_chord()
+
+        # Start new chord looping
+        self.samples[chord_name].set_volume(volume)
+        self.current_channel = self.samples[chord_name].play(loops=-1)  # -1 = infinite loop
+        self.currently_playing_chord = chord_name
+        return True
+
+    def update_volume(self, volume):
+        """
+        Update volume of currently playing chord
+
+        Args:
+            volume: volume level (0.0 to 1.0)
+        """
+        if self.currently_playing_chord and self.currently_playing_chord in self.samples:
+            volume = max(0.0, min(1.0, volume))
+            self.samples[self.currently_playing_chord].set_volume(volume)
+
+    def stop_chord(self):
+        """Stop currently playing chord"""
+        if self.current_channel:
+            self.current_channel.stop()
+        self.currently_playing_chord = None
+        self.current_channel = None
+
+    def is_playing(self):
+        """Check if a chord is currently playing"""
+        return self.current_channel is not None and self.current_channel.get_busy()
 
     def stop_all(self):
         """Stop all playing sounds"""
         pygame.mixer.stop()
+        self.currently_playing_chord = None
+        self.current_channel = None
 
     def cleanup(self):
         """Clean up resources"""
