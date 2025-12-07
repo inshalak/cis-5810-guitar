@@ -267,6 +267,33 @@ class AirGuitar:
             arrow = "↓ DOWN" if strum_dir == "down" else "↑ UP"
             cv2.putText(frame, f"Strum: {arrow}", (20, 100),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, TEXT_COLOR, 2)
+        
+        # Draw volume indicator (only in fun play mode)
+        if self.mode == 'fun_play':
+            velocity = self.strum_detector.get_last_strum_velocity()
+            volume_percent = int(velocity * 100)
+            
+            # Volume bar background
+            bar_x, bar_y = 20, 180
+            bar_width, bar_height = 200, 25
+            cv2.rectangle(frame, (bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height), 
+                         (50, 50, 50), -1)
+            
+            # Volume bar fill (color changes based on volume)
+            fill_width = int(bar_width * velocity)
+            if velocity < 0.3:
+                bar_color = (0, 100, 255)  # Orange for quiet
+            elif velocity < 0.7:
+                bar_color = (0, 200, 255)  # Yellow for medium
+            else:
+                bar_color = (0, 255, 0)  # Green for loud
+            
+            cv2.rectangle(frame, (bar_x, bar_y), (bar_x + fill_width, bar_y + bar_height), 
+                         bar_color, -1)
+            
+            # Volume text
+            cv2.putText(frame, f"Volume: {volume_percent}%", (bar_x, bar_y - 5),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, TEXT_COLOR, 2)
 
         # Draw FPS
         if self.fps_counter:
