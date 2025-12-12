@@ -1,8 +1,4 @@
-"""
-Strumming detection module for right hand
-Detects up/down strokes based on hand movement velocity
-Tracks velocity for dynamic volume control
-"""
+"""Detect strumming (up and down) from right-hand vertical motion"""
 
 import time
 from collections import deque
@@ -15,10 +11,10 @@ class StrumDetector:
         self.prev_time = None
         self.last_strum_time = 0
         self.strum_direction = None  # "up" or "down"
-        self.last_triggered_direction = None  # Track last triggered direction to prevent repeats
-        self.strum_velocity = 0.0  # Current strum velocity (normalized for volume)
-        self.velocity_history = deque(maxlen=3)  # Reduced for faster response at 30 FPS
-        self.current_motion_direction = None  # Track current motion direction
+        self.last_triggered_direction = None  # prevent repeat triggers in same motion
+        self.strum_velocity = 0.0  # normalized for volume control
+        self.velocity_history = deque(maxlen=3)  # small window for responsiveness
+        self.current_motion_direction = None
 
     def detect_strum(self, hand_landmarks):
         """
@@ -35,50 +31,38 @@ class StrumDetector:
             self.velocity_history.clear()
             return False, None, 0.0
 
-        # Use wrist position (landmark 0) for tracking movement
         current_y = hand_landmarks.landmark[0].y
         current_time = time.time()
 
-        # Initialize on first detection
         if self.prev_y_position is None or self.prev_time is None:
             self.prev_y_position = current_y
             self.prev_time = current_time
             return False, None, 0.0
 
-        # Calculate vertical movement and time delta
         delta_y = current_y - self.prev_y_position
         delta_time = current_time - self.prev_time
 
-        # Avoid division by zero
         if delta_time < 0.001:
             delta_time = 0.001
 
-        # Calculate velocity (absolute value of movement per second)
         velocity = abs(delta_y) / delta_time
         self.velocity_history.append(velocity)
 
-        # Check cooldown to prevent double-triggering
         if current_time - self.last_strum_time < STRUM_COOLDOWN:
             self.prev_y_position = current_y
             self.prev_time = current_time
             return False, None, self.strum_velocity
 
-        # Track current motion direction
         if abs(delta_y) > STRUM_THRESHOLD * 0.3:  # Lower threshold for direction tracking
             current_direction = "down" if delta_y > 0 else "up"
             self.current_motion_direction = current_direction
         
-        # Detect significant movement
         is_strum = False
         direction = None
 
         if abs(delta_y) > STRUM_THRESHOLD:
-            # Positive delta_y = downward movement, negative = upward
             direction = "down" if delta_y > 0 else "up"
             
-            # Only trigger if:
-            # 1. Direction has changed from last triggered direction (prevents repeats in same motion)
-            # 2. OR enough time has passed (cooldown)
             direction_changed = (self.last_triggered_direction != direction)
             
             if direction_changed:
@@ -87,28 +71,20 @@ class StrumDetector:
                 self.last_triggered_direction = direction
                 self.last_strum_time = current_time
 
-                # Calculate normalized velocity for volume (0.0 to 1.0)
-                # Use weighted average favoring recent velocity for faster response
                 if self.velocity_history:
-                    # Weight most recent velocity more heavily
                     weights = [0.2, 0.3, 0.5][:len(self.velocity_history)]
                     weighted_sum = sum(v * w for v, w in zip(self.velocity_history, weights))
                     avg_velocity = weighted_sum / sum(weights)
                 else:
                     avg_velocity = velocity
 
-                # Map velocity to volume range with MORE PRONOUNCED DIFFERENCE
-                # Optimized for 30 FPS: 0.2 (very slow) to 2.0 (very fast)
                 min_velocity = 0.2
                 max_velocity = 2.0
                 normalized_velocity = (avg_velocity - min_velocity) / (max_velocity - min_velocity)
                 normalized_velocity = max(0.0, min(1.0, normalized_velocity))  # Clamp to [0, 1]
 
-                # Apply exponential curve for more dramatic difference
-                # Slow strums are MUCH quieter, fast strums are MUCH louder
                 normalized_velocity = normalized_velocity ** 1.8  # Stronger exponential curve
 
-                # Map to WIDER volume range: 0.15 - 1.0 (more dramatic)
                 self.strum_velocity = 0.15 + (normalized_velocity * 0.85)
 
         self.prev_y_position = current_y

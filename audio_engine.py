@@ -1,7 +1,4 @@
-"""
-Audio engine for playing guitar chord samples
-Handles loading and playback of audio files
-"""
+"""Load and play chord audio samples via pygame"""
 
 import pygame
 import os
@@ -11,10 +8,8 @@ from config import AUDIO_SAMPLE_RATE, CHORD_MAP
 class AudioEngine:
     def __init__(self, samples_dir="audio_samples"):
         """
-        Initialize pygame mixer and load audio samples
-
         Args:
-            samples_dir: directory containing audio samples
+            samples_dir: directory containing audio samples (wav/mp3)
         """
         pygame.mixer.init(frequency=AUDIO_SAMPLE_RATE, channels=2)
         self.samples_dir = samples_dir
@@ -24,22 +19,18 @@ class AudioEngine:
     def _load_samples(self):
         """
         Load guitar chord samples from disk
-        Expected file format: C.wav, G.wav, D.wav, etc.
         """
-        # Create samples directory if it doesn't exist
         if not os.path.exists(self.samples_dir):
             os.makedirs(self.samples_dir)
-            print(f"Created {self.samples_dir} directory.")
-            print("Please add guitar chord samples (e.g., C.wav, G.wav, etc.)")
+            print(f"Created {self.samples_dir} directory")
+            print("Add chord samples like C.wav G.wav")
             return
 
-        # Get unique chord names from CHORD_MAP
         chord_names = set(CHORD_MAP.values())
 
         for chord in chord_names:
             sample_path = os.path.join(self.samples_dir, f"{chord}.wav")
 
-            # Try .wav first, then .mp3
             if not os.path.exists(sample_path):
                 sample_path = os.path.join(self.samples_dir, f"{chord}.mp3")
 
@@ -53,30 +44,20 @@ class AudioEngine:
                 print(f"Warning: Sample not found for chord {chord}")
 
         if not self.samples:
-            print("\n⚠️  No audio samples loaded!")
-            print("To add samples:")
-            print(f"  1. Download free guitar chord samples (WAV or MP3)")
-            print(f"  2. Place them in '{self.samples_dir}/' folder")
-            print(f"  3. Name them: C.wav, G.wav, D.wav, E.wav, A.wav, F.wav, Am.wav, Em.wav")
-            print("\nFree samples available at:")
-            print("  - Freesound.org: https://freesound.org/search/?q=guitar+chord")
-            print("  - SampleSwap: https://sampleswap.org/")
-
-            # ALTERNATIVE: Generate simple tones (commented out for now)
-            # Uncomment to use synthesized tones instead of samples
-            # self._generate_placeholder_tones()
+            print("\nNo audio samples loaded")
+            print(f"Put chord samples in {self.samples_dir}")
+            print("Expected chords: C G D E A F Am Em")
+            print("Or generate synthetic samples: python generate_samples.py")
 
     def _generate_placeholder_tones(self):
         """
         Generate simple sine wave tones as placeholders
-        (Uncomment in _load_samples if you don't have audio files)
         """
         import numpy as np
 
         duration = 1.0  # seconds
         sample_rate = AUDIO_SAMPLE_RATE
 
-        # Approximate frequencies for guitar chords (root note)
         chord_frequencies = {
             "C": 261.63,   # C4
             "G": 196.00,   # G3
@@ -89,23 +70,18 @@ class AudioEngine:
         }
 
         for chord, freq in chord_frequencies.items():
-            # Generate sine wave
             samples = np.sin(2 * np.pi * freq * np.linspace(0, duration, int(sample_rate * duration)))
 
-            # Add envelope (fade in/out) to prevent clicks
             envelope = np.ones_like(samples)
             fade_len = int(sample_rate * 0.05)  # 50ms fade
             envelope[:fade_len] = np.linspace(0, 1, fade_len)
             envelope[-fade_len:] = np.linspace(1, 0, fade_len)
             samples = samples * envelope
 
-            # Convert to 16-bit audio
             samples = (samples * 32767).astype(np.int16)
 
-            # Create stereo array
             stereo_samples = np.column_stack((samples, samples))
 
-            # Create Sound object
             sound = pygame.sndarray.make_sound(stereo_samples)
             self.samples[chord] = sound
             print(f"Generated tone for: {chord}")
@@ -119,9 +95,7 @@ class AudioEngine:
             volume: volume level (0.0 to 1.0), default is 1.0 (full volume)
         """
         if chord_name in self.samples:
-            # Clamp volume to valid range
             volume = max(0.0, min(1.0, volume))
-            # Set volume and play
             self.samples[chord_name].set_volume(volume)
             self.samples[chord_name].play()
             return True
@@ -134,16 +108,3 @@ class AudioEngine:
     def cleanup(self):
         """Clean up resources"""
         pygame.mixer.quit()
-
-
-# For custom audio samples, users can replace files in audio_samples/ directory:
-# Example structure:
-# audio_samples/
-#   C.wav
-#   G.wav
-#   D.wav
-#   E.wav
-#   A.wav
-#   F.wav
-#   Am.wav
-#   Em.wav
